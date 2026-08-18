@@ -4,4 +4,5 @@ resources:
   - namespace.yaml
   - ollama.yaml
   - open-webui.yaml
+  - navidrome.yaml
   - ingress.yaml

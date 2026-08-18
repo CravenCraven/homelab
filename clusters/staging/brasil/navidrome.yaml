@@ -1,0 +1,161 @@
+# Two PVCs on purpose.
+#
+# The database and the media have completely different lifecycles. The
+# database is small, changes constantly, and is regenerable by rescanning.
+# The music is large, effectively immutable once written, and is the thing
+# you would actually cry about losing.
+#
+# One combined volume would mean any backup policy has to treat a 100GB
+# library the same as a 50MB SQLite file. Splitting them means you can back
+# up what matters and rebuild what does not.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: navidrome-data
+  namespace: brasil
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: navidrome-music
+  namespace: brasil
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: navidrome
+  namespace: brasil
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: navidrome
+  template:
+    metadata:
+      labels:
+        app: navidrome
+    spec:
+      # Pinned to the Dell for storage, not for compute. Navidrome itself is
+      # a small Go binary. The 100Gi music PVC is the reason: local-path puts
+      # the volume on the node's own disk, and the Dell has 512GB while the
+      # MacBook's SSD is soldered and already hosting the control plane.
+      nodeSelector:
+        workload: heavy
+      securityContext:
+        # Navidrome runs as non-root. fsGroup makes the kubelet chgrp the
+        # volume contents on mount, otherwise the process cannot write its
+        # own database.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: navidrome
+          image: deluan/navidrome:0.55.2
+          ports:
+            - containerPort: 4533
+          env:
+            - name: ND_MUSICFOLDER
+              value: /music
+            - name: ND_DATAFOLDER
+              value: /data
+            # Cron syntax. 3am daily rather than the default hourly, since
+            # the library changes rarely and a scan is I/O heavy.
+            - name: ND_SCANSCHEDULE
+              value: "0 3 * * *"
+            # Scan once at boot so a fresh deploy finds existing files
+            # without waiting for 3am.
+            - name: ND_ENABLESTARTUPSCAN
+              value: "true"
+            - name: ND_LOGLEVEL
+              value: info
+            # Transcoding on a mobile CPU competing with Ollama is a bad
+            # trade. Serve the original files and let clients cope.
+            - name: ND_ENABLETRANSCODINGCONFIG
+              value: "false"
+            # Portuguese first, since the library is Brazilian.
+            - name: ND_DEFAULTLANGUAGE
+              value: pt
+          resources:
+            requests:
+              cpu: "100m"
+              memory: 256Mi
+            limits:
+              # The ceiling exists for the scan, not for playback. Streaming
+              # a file is nearly free; walking 10,000 files and reading tags
+              # is where it spikes.
+              cpu: "2"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: music
+              mountPath: /music
+              # Navidrome never needs to write to the library. Mounting it
+              # read-only means a bug in the scanner cannot delete your music.
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: 4533
+            failureThreshold: 20
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4533
+            periodSeconds: 30
+            timeoutSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: navidrome-data
+        - name: music
+          persistentVolumeClaim:
+            claimName: navidrome-music
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: navidrome
+  namespace: brasil
+spec:
+  selector:
+    app: navidrome
+  ports:
+    - port: 80
+      targetPort: 4533
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navidrome
+  namespace: brasil
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: musica.brasil.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: navidrome
+                port:
+                  number: 80
