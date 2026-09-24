@@ -74,11 +74,11 @@ spec:
               value: /data
             # Cron syntax. 3am daily rather than the default hourly, since
             # the library changes rarely and a scan is I/O heavy.
-            - name: ND_SCANSCHEDULE
+            - name: ND_SCANNER_SCHEDULE
               value: "0 3 * * *"
             # Scan once at boot so a fresh deploy finds existing files
             # without waiting for 3am.
-            - name: ND_ENABLESTARTUPSCAN
+            - name: ND_SCANNER_SCANONSTARTUP
               value: "true"
             - name: ND_LOGLEVEL
               value: info
