@@ -72,6 +72,8 @@ spec:
               value: /music
             - name: ND_DATAFOLDER
               value: /data
+            - name: TZ
+              value: "America/New_York"
             # Cron syntax. 3am daily rather than the default hourly, since
             # the library changes rarely and a scan is I/O heavy.
             - name: ND_SCANNER_SCHEDULE
