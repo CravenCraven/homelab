@@ -1,6 +1,6 @@
 # Laboratório Brasil
 
-[![validate](https://github.com/CravenCraven/homelab/actions/workflows/validate.yaml/badge.svg)](https://github.com/CravenCraven/homelab/actions/workflows/validate.yaml)
+[![validate](https://github.com/CravenCraven/homelab-brasil/actions/workflows/validate.yaml/badge.svg)](https://github.com/CravenCraven/homelab-brasil/actions/workflows/validate.yaml)
 ![k3s](https://img.shields.io/badge/k3s-3%20nodes-ffc61c?logo=k3s)
 ![Flux](https://img.shields.io/badge/GitOps-Flux-5468ff?logo=flux)
 ![status](https://img.shields.io/badge/status-staging-orange)
@@ -224,7 +224,7 @@ flux reconcile kustomization flux-system --with-source   # optional, skips the w
 ```bash
    flux bootstrap github \
      --owner=CravenCraven \
-     --repository=homelab \
+     --repository=homelab-brasil \
      --branch=main \
      --path=clusters/staging \
      --personal
