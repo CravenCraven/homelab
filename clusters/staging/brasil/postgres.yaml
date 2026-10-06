@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: corpus-db
+  namespace: brasil
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  storage:
+    size: 40Gi
+    storageClass: local-path
+  affinity:
+    nodeSelector:
+      workload: heavy
+  bootstrap:
+    initdb:
+      database: corpus
+      owner: corpus
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
